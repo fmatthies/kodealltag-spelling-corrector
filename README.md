@@ -1,0 +1,1 @@
+# kodealltag-spelling-corrector

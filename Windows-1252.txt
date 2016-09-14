@@ -1,0 +1,17 @@
+--- Finanz.Boerse 608 ---
+
+=84	Anführungszeichen unten
+=93	Anführungszeichen oben
+=92	Apostroph
+=AE	®
+=80	€
+
+=DC	Ü
+
+=FC	ü
+=E4	ä
+=F6	ö
+
+=DF	ß
+
+----> replace "=" with "\x" and python (ftfy) can correctly recognize characters

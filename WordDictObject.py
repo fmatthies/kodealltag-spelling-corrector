@@ -8,7 +8,7 @@ import collections
 class WordDictObject(object):
     
     def __init__(self, word_dict_path):
-        self._word_dict_path = word_dict_path
+        self._word_dict_path = os.path.abspath(word_dict_path)
         self._word_dict = collections.defaultdict(lambda: 1)
         
         self._read_word_dict()

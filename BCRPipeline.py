@@ -6,6 +6,7 @@ import BadCharReplacer
 import WordDictObject
 import os
 import sys
+import subprocess
 import threading
 
 
@@ -27,26 +28,35 @@ class EmailWalker(object):
         return self.emails
 
 class PipeThread(threading.Thread):
-    def __init__(self, threadID, name, subset, pretokenizer, charrepl):
+    def __init__(self, threadID, name, subset, pretokenizer, charrepl, stok):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
         self.subset = subset
         self.pretok = pretokenizer
         self.charrepl = charrepl
+        self.sent_tokenizer = stok
 
     def run(self):
         print("Starting {} with {} E-Mails".format(self.name, len(self.subset)))
         for mail in self.subset:
-            txt = open(mail).read()
-            ctoks = cleanTokens(txt, self.pretok, self.charrepl)
-            tagged = runTreeTagger(ctoks)
+            tagged = list()
+            with open(mail) as m:
+                txt = m.readlines()
+            # returns a list of sentences
+            txt = removeComments(txt)
+            sents = splitSentences(txt, self.sent_tokenizer)
+            for sent in sents:
+                # returns a list of tokens
+                ctoks = cleanTokens(sent, self.pretok, self.charrepl)
+                # returns list of tab seperated items
+                tagged.append("\n".join(runTreeTagger(ctoks)))
             self.writeTags(tagged, mail)
         print("Exiting {}".format(self.name))
         
     def writeTags(self, tagged, mail):
         with open(mail+".tok", "w") as tfile:
-            tfile.write("\n".join(tagged))
+            tfile.write("\n\n".join(tagged))
 
 def getEmails(base_path):
     base_path = os.path.abspath(base_path)
@@ -63,12 +73,20 @@ def getTestText():
     "Wei� jemand genaueres?"]
     return txt_list
 
+def removeComments(txt):
+    # remove comments
+    return "".join([t for t in txt if not t.startswith('>')])
+
 def cleanTokens(text, pretokenizer, charrepl):
     tokens = pretokenizer.tokenize(text)
     cleaned_tokens = [charrepl.repl_unicode_qmark(token) for token in tokens]
     
     return cleaned_tokens
-    
+
+def splitSentences(txt, stok):
+    sents = stok.tokenize(txt)
+    return [s.rstrip("\n") for s in sents]
+
 def runTreeTagger(tlist, lang="de"):
     ttagger = treetaggerwrapper.TreeTagger(TAGLANG=lang)
     
@@ -78,7 +96,7 @@ def runTreeTagger(tlist, lang="de"):
     
     return tags
 
-def startThreads(fi_list, wpt, bcr, thread_count=4):
+def startThreads(fi_list, wpt, bcr, stok, thread_count=4):
     sub_size = int(len(fi_list)/thread_count)
     
     for i in range(thread_count + 1):
@@ -87,7 +105,7 @@ def startThreads(fi_list, wpt, bcr, thread_count=4):
             subs = fi_list[i*sub_size:]
         
         thread = PipeThread(i, "Subset-{}".format(str(i)),
-            subs, wpt, bcr)
+            subs, wpt, bcr, stok)
         thread.start()
 
 if __name__ == "__main__":
@@ -101,5 +119,6 @@ if __name__ == "__main__":
     wdo = WordDictObject.WordDictObject(wdpath)
     wpt = nltk.tokenize.RegexpTokenizer(regex)
     bcr = BadCharReplacer.BadCharReplacer(wdo)
+    stok = nltk.data.load("tokenizers/punkt/german.pickle")
 
-    startThreads(m, wpt, bcr, thread_count)
+    startThreads(m, wpt, bcr, stok, thread_count)

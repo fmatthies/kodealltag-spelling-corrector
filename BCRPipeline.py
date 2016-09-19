@@ -29,7 +29,7 @@ class EmailWalker(object):
         return self.emails
 
 class PipeThread(threading.Thread):
-    def __init__(self, threadID, name, subset, pretokenizer, charrepl, stok, bow=False):
+    def __init__(self, threadID, name, subset, pretokenizer, charrepl, stok, bow=False, out_folder=None):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
@@ -38,6 +38,7 @@ class PipeThread(threading.Thread):
         self.charrepl = charrepl
         self.sent_tokenizer = stok
         self.writeBoW = bow
+        self.outFolder = out_folder
 
     def run(self):
         print("Starting {} with {} E-Mails".format(self.name, len(self.subset)))
@@ -57,10 +58,20 @@ class PipeThread(threading.Thread):
         print("Exiting {}".format(self.name))
         
     def writeTags(self, tagged, mail):
-        with open(mail+".tok", "w") as tfile:
+        out = mail
+        if self.outFolder:
+            ofoo, ofind = self.outFolder
+            if (os.path.dirname(mail)).find(ofind) >= 0:
+                ofoo = os.path.abspath(ofoo)
+                out = os.path.join(ofoo, mail[(os.path.dirname(mail)).find(ofind):])
+            else:
+                out = os.path.join(ofoo, os.path.basename(mail))
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+
+        with open(out+".tok", "w") as tfile:
             tfile.write("\n\n".join(tagged))
         if self.writeBoW:
-            with open(mail+".lem", "w") as lfile:
+            with open(out+".lem", "w") as lfile:
                 lfile.write(" ".join(
                     [(line.split("\t")[-1]).lower() for sent in tagged
                         for line in sent.split("\n") if not re.search("(\$.|\$\()", line.split("\t")[1])]
@@ -118,7 +129,7 @@ def runTreeTagger(tlist, lang="de"):
     
     return tags
 
-def startThreads(fi_list, wpt, bcr, stok, thread_count=4, bow=False):
+def startThreads(fi_list, wpt, bcr, stok, thread_count=4, bow=False, out_folder=None):
     sub_size = int(len(fi_list)/thread_count)
     
     for i in range(thread_count + 1):
@@ -127,12 +138,14 @@ def startThreads(fi_list, wpt, bcr, stok, thread_count=4, bow=False):
             subs = fi_list[i*sub_size:]
         
         thread = PipeThread(i, "Subset-{}".format(str(i)),
-            subs, wpt, bcr, stok, bow)
+            subs, wpt, bcr, stok, bow, out_folder)
         thread.start()
 
 if __name__ == "__main__":
     
     main_folder = "/home/matthies/experiments/kodeAlltag/sample/"
+    # ToDo: desc outfolder format
+    out_folder = ("/home/matthies/experiments/kodeAlltag/sample/out/","de.")
     tok_model = "tokenizers/punkt/german.pickle"
     wdpath = "pickled_dicts/"
     regex = "[\w|�]+|[^\w\s]+"
@@ -141,10 +154,12 @@ if __name__ == "__main__":
 
     
     m = getEmails(main_folder)
+    print(m)
+
     
     wdo = WordDictObject.WordDictObject(wdpath)
     wpt = nltk.tokenize.RegexpTokenizer(regex)
     bcr = BadCharReplacer.BadCharReplacer(wdo)
     stok = nltk.data.load(tok_model)
 
-    startThreads(m, wpt, bcr, stok, thread_count, bow)
+    startThreads(m, wpt, bcr, stok, thread_count, bow, out_folder)

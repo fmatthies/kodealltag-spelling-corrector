@@ -6,6 +6,7 @@ import BadCharReplacer
 import WordDictObject
 import os
 import sys
+import re
 import subprocess
 import threading
 
@@ -28,7 +29,7 @@ class EmailWalker(object):
         return self.emails
 
 class PipeThread(threading.Thread):
-    def __init__(self, threadID, name, subset, pretokenizer, charrepl, stok):
+    def __init__(self, threadID, name, subset, pretokenizer, charrepl, stok, bow=False):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
@@ -36,6 +37,7 @@ class PipeThread(threading.Thread):
         self.pretok = pretokenizer
         self.charrepl = charrepl
         self.sent_tokenizer = stok
+        self.writeBoW = bow
 
     def run(self):
         print("Starting {} with {} E-Mails".format(self.name, len(self.subset)))
@@ -57,6 +59,13 @@ class PipeThread(threading.Thread):
     def writeTags(self, tagged, mail):
         with open(mail+".tok", "w") as tfile:
             tfile.write("\n\n".join(tagged))
+        if self.writeBoW:
+            with open(mail+".lem", "w") as lfile:
+                lfile.write(" ".join(
+                    [(line.split("\t")[-1]).lower() for sent in tagged
+                        for line in sent.split("\n") if not re.search("(\$.|\$\()", line.split("\t")[1])]
+                    )
+                )
 
 def getEmails(base_path):
     base_path = os.path.abspath(base_path)
@@ -74,8 +83,21 @@ def getTestText():
     return txt_list
 
 def removeComments(txt):
-    # remove comments
-    return "".join([t for t in txt if not t.startswith('>')])
+    count = 0
+    n_txt = list()
+    for line in txt:
+        # remove comments and signatures
+        if line.startswith("--"):
+            break
+        # remove first line if intro to quotation
+        if count == 0:
+            if not re.search("(said|sagte|wrote|schrieb|skrev):", line):
+                n_txt.append(line)
+        else:
+            if not (line.startswith('>') or line.startswith(':')):
+                n_txt.append(line)
+        count += 1
+    return "".join(n_txt)
 
 def cleanTokens(text, pretokenizer, charrepl):
     tokens = pretokenizer.tokenize(text)
@@ -96,7 +118,7 @@ def runTreeTagger(tlist, lang="de"):
     
     return tags
 
-def startThreads(fi_list, wpt, bcr, stok, thread_count=4):
+def startThreads(fi_list, wpt, bcr, stok, thread_count=4, bow=False):
     sub_size = int(len(fi_list)/thread_count)
     
     for i in range(thread_count + 1):
@@ -105,20 +127,24 @@ def startThreads(fi_list, wpt, bcr, stok, thread_count=4):
             subs = fi_list[i*sub_size:]
         
         thread = PipeThread(i, "Subset-{}".format(str(i)),
-            subs, wpt, bcr, stok)
+            subs, wpt, bcr, stok, bow)
         thread.start()
 
 if __name__ == "__main__":
     
+    main_folder = "/home/matthies/experiments/kodeAlltag/sample/"
+    tok_model = "tokenizers/punkt/german.pickle"
     wdpath = "pickled_dicts/"
     regex = "[\w|�]+|[^\w\s]+"
     thread_count = 4
+    bow = True
+
     
-    m = getEmails("/home/matthies/experiments/kodeAlltag/tok_subsets/film.misc/")
+    m = getEmails(main_folder)
     
     wdo = WordDictObject.WordDictObject(wdpath)
     wpt = nltk.tokenize.RegexpTokenizer(regex)
     bcr = BadCharReplacer.BadCharReplacer(wdo)
-    stok = nltk.data.load("tokenizers/punkt/german.pickle")
+    stok = nltk.data.load(tok_model)
 
-    startThreads(m, wpt, bcr, stok, thread_count)
+    startThreads(m, wpt, bcr, stok, thread_count, bow)

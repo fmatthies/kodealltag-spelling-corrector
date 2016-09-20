@@ -22,12 +22,12 @@ class PipelineParser(argparse.ArgumentParser):
         self.add_argument(
             '-o', '--out-folder', metavar = 'Output-Folder',
             action = 'store', nargs = '?', default = None,
-            type = str, help = 'If this argument is given, the produced ".tok" files are stored here; either relative or absolute (default: they are stored alongside their respective original txt files)'
+            type = str, help = 'If this argument is given, the produced ".tok" files are stored here; either relative or absolute values possible (default: they are stored alongside their respective original ".txt" files)'
         )
         self.add_argument(
             '-s', '--sent-tok', metavar = 'Sentence Tokenizer',
             action = 'store', nargs = '?', default = 'german',
-            type = str, help = 'A Tokenizer model (anything that is accesible from NLTK is possible (default: german)'
+            type = str, help = 'A Tokenizer model; anything that is accesible from NLTK is possible (default: german)'
         )
         self.add_argument(
             '-d', '--word-dict', metavar = 'Word Dictionary',
@@ -77,8 +77,8 @@ class PipeThread(threading.Thread):
         self.pretok = pretokenizer
         self.charrepl = charrepl
         self.sent_tokenizer = stok
-        self.writeBoW = bow
-        self.outFolder = out_folder
+        self.write_bow = bow
+        self.out_folder = out_folder
         self.main_folder = os.path.abspath(ifoo)
 
     def run(self):
@@ -102,12 +102,12 @@ class PipeThread(threading.Thread):
         out = mail
         if self.out_folder:
             out = os.path.relpath(mail, self.main_folder)
-            os.path.join(self.out_folder, out)
+            out = os.path.join(self.out_folder, out)
             os.makedirs(os.path.dirname(out), exist_ok=True)
 
         with open(out+".tok", "w") as tfile:
             tfile.write("\n\n".join(tagged))
-        if self.writeBoW:
+        if self.write_bow:
             with open(out+".lem", "w") as lfile:
                 for sent in tagged:
                     lines = sent.split("\n")
@@ -168,7 +168,7 @@ def runTreeTagger(tlist, lang="de"):
     
     return tags
 
-def startThreads(fi_list, wpt, bcr, stok, ifoo, thread_count=4, bow=False, out_folder=None):
+def startThreads(fi_list, wpt, bcr, stok, in_folder, thread_count=4, bow=False, out_folder=None):
     sub_size = int(len(fi_list)/thread_count)
     
     for i in range(thread_count + 1):
@@ -177,12 +177,15 @@ def startThreads(fi_list, wpt, bcr, stok, ifoo, thread_count=4, bow=False, out_f
             subs = fi_list[i*sub_size:]
         
         thread = PipeThread(i, "Subset-{}".format(str(i)),
-            subs, wpt, bcr, stok, ifoo, bow, out_folder)
+            subs, wpt, bcr, stok, in_folder, bow, out_folder)
         thread.start()
 
 if __name__ == "__main__":
     parser = PipelineParser()
     args = vars(parser.parse_args())
+
+    # TODO: BCR either on or off??
+    # TODO: optional comment removing
 
     mails = getEmails(args['input-folder'][0])
     wrd_dict = WordDictObject.WordDictObject(args['word_dict'])
@@ -197,5 +200,4 @@ if __name__ == "__main__":
         in_folder = args['input-folder'][0],
         thread_count = args['threads'],
         bow = args['bag_of_words'],
-        out_folder = args['out_folder']
-    )
+        out_folder = args['out_folder'])

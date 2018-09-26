@@ -80,6 +80,7 @@ class PipeThread(threading.Thread):
         self.write_bow = bow
         self.out_folder = out_folder
         self.main_folder = os.path.abspath(ifoo)
+        self.ttagger = treetaggerwrapper.TreeTagger(TAGLANG="de")
 
     def run(self):
         print("Starting {} with {} E-Mails".format(self.name, len(self.subset)))
@@ -92,9 +93,9 @@ class PipeThread(threading.Thread):
             sents = splitSentences(txt, self.sent_tokenizer)
             for sent in sents:
                 # returns a list of tokens
-                ctoks = cleanTokens(sent, self.pretok, self.charrepl)
-                # returns list of tab seperated items
-                tagged.append("\n".join(runTreeTagger(ctoks)))
+                ctoks = cleanTokens(sent.rstrip("\n"), self.pretok, self.charrepl)
+                # returns list of tab separated items
+                tagged.append("\n".join(runTreeTagger(ctoks, self.ttagger)))
             self.writeTags(tagged, mail)
         print("Exiting {}".format(self.name))
         
@@ -156,16 +157,12 @@ def cleanTokens(text, pretokenizer, charrepl):
     return cleaned_tokens
 
 def splitSentences(txt, stok):
-    sents = stok.tokenize(txt)
-    return [s.rstrip("\n") for s in sents]
+    return stok.tokenize(txt)
 
-def runTreeTagger(tlist, lang="de"):
-    ttagger = treetaggerwrapper.TreeTagger(TAGLANG=lang)
-    
+def runTreeTagger(tlist, ttagger):
     # tags is a list of tab seperated items:
     #   [WORD1\tPOS1\tLEMMA1, WORD2\tPOS2\tLEMMA2, ...]
     tags = ttagger.tag_text(" ".join(tlist))
-    
     return tags
 
 def startThreads(fi_list, wpt, bcr, stok, in_folder, thread_count=4, bow=False, out_folder=None):
@@ -186,7 +183,7 @@ if __name__ == "__main__":
 
     # TODO: BCR either on or off??
     # TODO: optional comment removing
-
+    
     mails = getEmails(args['input-folder'][0])
     wrd_dict = WordDictObject.WordDictObject(args['word_dict'])
     prel_tok = nltk.tokenize.RegexpTokenizer(args['tok_regex'])

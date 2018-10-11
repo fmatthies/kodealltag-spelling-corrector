@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+
 class BadCharReplacer(object):
     def __init__(self, word_dict_obj):
         self._umlaute = "äöüß"
@@ -23,15 +24,15 @@ class BadCharReplacer(object):
     def _known_edits2(self, word, uml_only=True):
         return set(e2 for e1 in self._edits1(word, uml_only) \
                    for e2 in self._edits1(e1, uml_only) \
-                   if e2 in self._word_dict.getWordDict())
+                   if e2 in self._word_dict.get_word_dict())
     
     def _known(self, words):
-        return set(w for w in words if w in self._word_dict.getWordDict())
+        return set(w for w in words if w in self._word_dict.get_word_dict())
     
     def _correct(self, word, uml_only=True):
         candidates = self._known([word]) or self._known(self._edits1(word, uml_only)) \
             or self._known_edits2(word, uml_only) or [word]
-        return max(candidates, key=self._word_dict.getWordDict().get)
+        return max(candidates, key=self._word_dict.get_word_dict().get)
     
     def _unigram_replacement(self, word, uml_only=True):
         return word

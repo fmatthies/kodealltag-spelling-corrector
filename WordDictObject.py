@@ -2,8 +2,10 @@
 
 import os
 import glob
-import dill as pickle # for being able to pickle functions
 import collections
+
+import dill as pickle # for being able to pickle functions
+
 
 class WordDictObject(object):
     
@@ -14,15 +16,15 @@ class WordDictObject(object):
         self._read_word_dict()
         
     def _read_word_dict(self):
-        wdp = self.getWordDictPath()
-        wd = self.getWordDict()
+        wdp = self.get_word_dict_path()
+        wd = self.get_word_dict()
         
         for pi in glob.glob(os.path.join(wdp, "*.pickle")):
             temp_dict = pickle.load(open(pi, "rb"))
             wd.update(temp_dict)
             
-    def getWordDictPath(self):
+    def get_word_dict_path(self):
         return self._word_dict_path
     
-    def getWordDict(self):
+    def get_word_dict(self):
         return self._word_dict
